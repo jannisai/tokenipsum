@@ -494,8 +494,7 @@ fn extract_argument(req: &MessagesRequest) -> String {
             || "unknown".to_string(),
             |text| {
                 text.split_whitespace()
-                    .filter(|w| w.len() > 2)
-                    .next_back()
+                    .rfind(|w| w.len() > 2)
                     .unwrap_or("unknown")
                     .trim_matches(|ch: char| !ch.is_alphanumeric())
                     .to_string()

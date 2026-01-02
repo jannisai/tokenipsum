@@ -293,8 +293,7 @@ fn non_stream_response(
             || "unknown".to_string(),
             |t| {
                 t.split_whitespace()
-                    .filter(|w| w.len() > 2)
-                    .next_back()
+                    .rfind(|w| w.len() > 2)
                     .unwrap_or("unknown")
                     .to_string()
             },
@@ -442,8 +441,7 @@ async fn stream_response(
             || "unknown".to_string(),
             |t| {
                 t.split_whitespace()
-                    .filter(|w| w.len() > 2)
-                    .next_back()
+                    .rfind(|w| w.len() > 2)
                     .unwrap_or("unknown")
                     .to_string()
             },

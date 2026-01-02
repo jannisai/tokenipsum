@@ -444,8 +444,7 @@ fn extract_argument(req: &ChatCompletionRequest) -> String {
                 // Try to extract a location or query
                 // Simple: take last word that might be a proper noun
                 c.split_whitespace()
-                    .filter(|w| w.len() > 2)
-                    .next_back()
+                    .rfind(|w| w.len() > 2)
                     .unwrap_or("unknown")
                     .trim_matches(|ch: char| !ch.is_alphanumeric())
                     .to_string()
