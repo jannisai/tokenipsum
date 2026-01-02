@@ -4,6 +4,12 @@ version = "0.1.0"
 edition = "2021"
 description = "Mock LLM API server for testing - generates fake but structurally accurate responses"
 license = "MIT OR Apache-2.0"
+repository = "https://github.com/jannisai/tokenipsum"
+homepage = "https://github.com/jannisai/tokenipsum"
+documentation = "https://docs.rs/tokenipsum"
+readme = "README.md"
+keywords = ["llm", "mock", "testing", "api", "openai"]
+categories = ["development-tools::testing", "simulation"]
 
 [lib]
 name = "tokenipsum"
