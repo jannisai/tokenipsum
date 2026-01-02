@@ -321,7 +321,7 @@ async fn stream_response(
         .then(|chunk| async move {
             // Add small delay for realistic streaming
             sleep(Duration::from_millis(15)).await;
-            format!("data: {}\n\n", chunk)
+            format!("data: {chunk}\n\n")
         })
         .chain(stream::once(async { "data: [DONE]\n\n".to_string() }))
         .map(Ok::<_, std::convert::Infallible>);
@@ -438,17 +438,19 @@ fn extract_argument(req: &ChatCompletionRequest) -> String {
     req.messages
         .last()
         .and_then(|m| m.content.as_ref())
-        .map(|c| {
-            // Try to extract a location or query
-            // Simple: take last word that might be a proper noun
-            c.split_whitespace()
-                .filter(|w| w.len() > 2)
-                .last()
-                .unwrap_or("unknown")
-                .trim_matches(|c: char| !c.is_alphanumeric())
-                .to_string()
-        })
-        .unwrap_or_else(|| "unknown".to_string())
+        .map_or_else(
+            || "unknown".to_string(),
+            |c| {
+                // Try to extract a location or query
+                // Simple: take last word that might be a proper noun
+                c.split_whitespace()
+                    .filter(|w| w.len() > 2)
+                    .next_back()
+                    .unwrap_or("unknown")
+                    .trim_matches(|ch: char| !ch.is_alphanumeric())
+                    .to_string()
+            },
+        )
 }
 
 /// Get current unix timestamp.

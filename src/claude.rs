@@ -421,7 +421,7 @@ async fn stream_response(
         let chunks = gen.stream_chunks(max_tokens);
         for (i, chunk) in chunks.iter().enumerate() {
             let prefix = if i > 0 { " " } else { "" };
-            let text = format!("{}{}", prefix, chunk);
+            let text = format!("{prefix}{chunk}");
             output_tokens += ContentGenerator::estimate_tokens(&text);
 
             events.push(format!(
@@ -490,15 +490,17 @@ fn extract_argument(req: &MessagesRequest) -> String {
                 _ => None,
             }),
         })
-        .map(|text| {
-            text.split_whitespace()
-                .filter(|w| w.len() > 2)
-                .last()
-                .unwrap_or("unknown")
-                .trim_matches(|c: char| !c.is_alphanumeric())
-                .to_string()
-        })
-        .unwrap_or_else(|| "unknown".to_string())
+        .map_or_else(
+            || "unknown".to_string(),
+            |text| {
+                text.split_whitespace()
+                    .filter(|w| w.len() > 2)
+                    .next_back()
+                    .unwrap_or("unknown")
+                    .trim_matches(|ch: char| !ch.is_alphanumeric())
+                    .to_string()
+            },
+        )
 }
 
 #[cfg(test)]

@@ -322,7 +322,7 @@ async fn stream_response(
             .enumerate()
             .map(|(i, content)| {
                 let prefix = if i > 0 { " " } else { "" };
-                let text = format!("{}{}", prefix, content);
+                let text = format!("{prefix}{content}");
                 total_tokens += ContentGenerator::estimate_tokens(&text);
 
                 json!({
@@ -368,7 +368,7 @@ async fn stream_response(
     let stream = stream::iter(chunks)
         .then(|chunk| async move {
             sleep(Duration::from_millis(15)).await;
-            format!("data: {}\n\n", chunk)
+            format!("data: {chunk}\n\n")
         })
         .map(Ok::<_, std::convert::Infallible>);
 
@@ -400,15 +400,17 @@ fn extract_argument(req: &GenerateContentRequest) -> String {
         .last()
         .and_then(|c| c.parts.first())
         .and_then(|p| p.text.as_ref())
-        .map(|text| {
-            text.split_whitespace()
-                .filter(|w| w.len() > 2)
-                .last()
-                .unwrap_or("unknown")
-                .trim_matches(|c: char| !c.is_alphanumeric())
-                .to_string()
-        })
-        .unwrap_or_else(|| "unknown".to_string())
+        .map_or_else(
+            || "unknown".to_string(),
+            |text| {
+                text.split_whitespace()
+                    .filter(|w| w.len() > 2)
+                    .next_back()
+                    .unwrap_or("unknown")
+                    .trim_matches(|ch: char| !ch.is_alphanumeric())
+                    .to_string()
+            },
+        )
 }
 
 #[cfg(test)]

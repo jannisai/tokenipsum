@@ -85,10 +85,16 @@ pub fn create_router(state: Arc<RuntimeState>) -> Router {
         app = app.route("/v1/responses", post(openai_handler));
     }
 
-    app.layer(middleware::from_fn_with_state(state.clone(), error_middleware))
-        .layer(middleware::from_fn_with_state(state.clone(), latency_middleware))
-        .layer(CorsLayer::permissive())
-        .with_state(state)
+    app.layer(middleware::from_fn_with_state(
+        state.clone(),
+        error_middleware,
+    ))
+    .layer(middleware::from_fn_with_state(
+        state.clone(),
+        latency_middleware,
+    ))
+    .layer(CorsLayer::permissive())
+    .with_state(state)
 }
 
 async fn health() -> &'static str {

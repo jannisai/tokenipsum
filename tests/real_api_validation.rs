@@ -119,7 +119,9 @@ mod cerebras {
             std::env::var("MOCK_URL").unwrap_or_else(|_| "http://localhost:8787".to_string());
 
         let real = call_real_api(&api_key).await.expect("Real API call failed");
-        let mock = call_mock_api(&mock_url).await.expect("Mock API call failed");
+        let mock = call_mock_api(&mock_url)
+            .await
+            .expect("Mock API call failed");
 
         print_comparison("Cerebras Non-Streaming", &real, &mock);
 
@@ -133,7 +135,11 @@ mod cerebras {
         assert!(mock_keys.contains("usage"), "Mock missing 'usage'");
 
         // Check critical nested fields
-        let critical = ["choices[*].message", "choices[*].finish_reason", "usage.total_tokens"];
+        let critical = [
+            "choices[*].message",
+            "choices[*].finish_reason",
+            "usage.total_tokens",
+        ];
         for key in critical {
             assert!(
                 mock_keys.iter().any(|k| k.contains(key)),
@@ -196,13 +202,18 @@ mod gemini {
             std::env::var("MOCK_URL").unwrap_or_else(|_| "http://localhost:8787".to_string());
 
         let real = call_real_api(&api_key).await.expect("Real API call failed");
-        let mock = call_mock_api(&mock_url).await.expect("Mock API call failed");
+        let mock = call_mock_api(&mock_url)
+            .await
+            .expect("Mock API call failed");
 
         print_comparison("Gemini Non-Streaming", &real, &mock);
 
         let mock_keys = extract_keys(&mock, "");
 
-        assert!(mock_keys.contains("candidates"), "Mock missing 'candidates'");
+        assert!(
+            mock_keys.contains("candidates"),
+            "Mock missing 'candidates'"
+        );
         assert!(
             mock_keys.contains("usageMetadata"),
             "Mock missing 'usageMetadata'"
@@ -272,7 +283,9 @@ mod claude {
             std::env::var("MOCK_URL").unwrap_or_else(|_| "http://localhost:8787".to_string());
 
         let real = call_real_api(&api_key).await.expect("Real API call failed");
-        let mock = call_mock_api(&mock_url).await.expect("Mock API call failed");
+        let mock = call_mock_api(&mock_url)
+            .await
+            .expect("Mock API call failed");
 
         print_comparison("Claude Non-Streaming", &real, &mock);
 
@@ -283,10 +296,18 @@ mod claude {
         assert!(mock_keys.contains("role"), "Mock missing 'role'");
         assert!(mock_keys.contains("model"), "Mock missing 'model'");
         assert!(mock_keys.contains("content"), "Mock missing 'content'");
-        assert!(mock_keys.contains("stop_reason"), "Mock missing 'stop_reason'");
+        assert!(
+            mock_keys.contains("stop_reason"),
+            "Mock missing 'stop_reason'"
+        );
         assert!(mock_keys.contains("usage"), "Mock missing 'usage'");
 
-        let critical = ["content[*].type", "content[*].text", "usage.input_tokens", "usage.output_tokens"];
+        let critical = [
+            "content[*].type",
+            "content[*].text",
+            "usage.input_tokens",
+            "usage.output_tokens",
+        ];
         for key in critical {
             assert!(
                 mock_keys.iter().any(|k| k.contains(key)),
@@ -349,18 +370,25 @@ mod claude {
         let content = mock.get("content").expect("No content in mock");
         let has_thinking = content
             .as_array()
-            .map(|arr| arr.iter().any(|c| c.get("type") == Some(&Value::String("thinking".to_string()))))
+            .map(|arr| {
+                arr.iter()
+                    .any(|c| c.get("type") == Some(&Value::String("thinking".to_string())))
+            })
             .unwrap_or(false);
 
         assert!(has_thinking, "Mock missing thinking block");
 
         // Check signature exists in thinking block
-        let thinking_block = content
-            .as_array()
-            .and_then(|arr| arr.iter().find(|c| c.get("type") == Some(&Value::String("thinking".to_string()))));
+        let thinking_block = content.as_array().and_then(|arr| {
+            arr.iter()
+                .find(|c| c.get("type") == Some(&Value::String("thinking".to_string())))
+        });
 
         if let Some(block) = thinking_block {
-            assert!(block.get("signature").is_some(), "Thinking block missing signature");
+            assert!(
+                block.get("signature").is_some(),
+                "Thinking block missing signature"
+            );
         }
 
         println!("✓ Claude thinking validation passed");
@@ -411,7 +439,9 @@ mod openai {
             std::env::var("MOCK_URL").unwrap_or_else(|_| "http://localhost:8787".to_string());
 
         let real = call_real_api(&api_key).await.expect("Real API call failed");
-        let mock = call_mock_api(&mock_url).await.expect("Mock API call failed");
+        let mock = call_mock_api(&mock_url)
+            .await
+            .expect("Mock API call failed");
 
         print_comparison("OpenAI Responses", &real, &mock);
 
@@ -493,7 +523,10 @@ mod tool_calling {
         // Check tool_use block
         let mock_content = mock.get("content").and_then(|c| c.as_array());
         let has_tool_use = mock_content
-            .map(|arr| arr.iter().any(|c| c.get("type") == Some(&Value::String("tool_use".to_string()))))
+            .map(|arr| {
+                arr.iter()
+                    .any(|c| c.get("type") == Some(&Value::String("tool_use".to_string())))
+            })
             .unwrap_or(false);
 
         assert!(has_tool_use, "Mock missing tool_use block");

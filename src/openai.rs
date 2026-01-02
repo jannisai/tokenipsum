@@ -288,16 +288,17 @@ fn non_stream_response(
 
     let (output, output_tokens) = if wants_tools {
         let tool = req.tools.as_ref().and_then(|t| t.first());
-        let tool_name = tool.map(|t| t.name.clone()).unwrap_or_else(|| "unknown".to_string());
-        let arg_value = extract_input_text(&req.input)
-            .map(|t| {
+        let tool_name = tool.map_or_else(|| "unknown".to_string(), |t| t.name.clone());
+        let arg_value = extract_input_text(&req.input).map_or_else(
+            || "unknown".to_string(),
+            |t| {
                 t.split_whitespace()
                     .filter(|w| w.len() > 2)
-                    .last()
+                    .next_back()
                     .unwrap_or("unknown")
                     .to_string()
-            })
-            .unwrap_or_else(|| "unknown".to_string());
+            },
+        );
 
         (
             vec![OutputItem::FunctionCall {
@@ -340,7 +341,9 @@ fn non_stream_response(
             input_tokens,
             input_tokens_details: TokenDetails { cached_tokens: 0 },
             output_tokens,
-            output_tokens_details: OutputTokenDetails { reasoning_tokens: 0 },
+            output_tokens_details: OutputTokenDetails {
+                reasoning_tokens: 0,
+            },
             total_tokens: input_tokens + output_tokens,
         },
         billing: Some(Billing { payer: "openai" }),
@@ -360,7 +363,9 @@ fn non_stream_response(
         store: req.store.unwrap_or(true),
         temperature: req.temperature.unwrap_or(1.0),
         text: TextOutput {
-            format: TextFormatOutput { format_type: "text" },
+            format: TextFormatOutput {
+                format_type: "text",
+            },
             verbosity: "medium",
         },
         tool_choice: "auto",
@@ -389,9 +394,7 @@ async fn stream_response(
     let mut seq = 0u32;
 
     // Helper to create event
-    let event = |name: &str, data: Value| -> String {
-        format!("event: {}\ndata: {}\n\n", name, data)
-    };
+    let event = |name: &str, data: Value| -> String { format!("event: {name}\ndata: {data}\n\n") };
 
     // response.created
     events.push(event(
@@ -434,16 +437,17 @@ async fn stream_response(
 
     if wants_tools {
         let tool = req.tools.as_ref().and_then(|t| t.first());
-        let tool_name = tool.map(|t| t.name.clone()).unwrap_or_else(|| "unknown".to_string());
-        let arg_value = extract_input_text(&req.input)
-            .map(|t| {
+        let tool_name = tool.map_or_else(|| "unknown".to_string(), |t| t.name.clone());
+        let arg_value = extract_input_text(&req.input).map_or_else(
+            || "unknown".to_string(),
+            |t| {
                 t.split_whitespace()
                     .filter(|w| w.len() > 2)
-                    .last()
+                    .next_back()
                     .unwrap_or("unknown")
                     .to_string()
-            })
-            .unwrap_or_else(|| "unknown".to_string());
+            },
+        );
         let fc_id = format!("fc_{}", gen.tool_call_id());
         let call_id = generate_call_id(&mut gen);
 
@@ -564,7 +568,7 @@ async fn stream_response(
         let mut full_text = String::new();
         for (i, chunk) in content_parts.iter().enumerate() {
             let delta = if i > 0 {
-                format!(" {}", chunk)
+                format!(" {chunk}")
             } else {
                 chunk.clone()
             };
@@ -751,7 +755,9 @@ mod tests {
                 input_tokens: 10,
                 input_tokens_details: TokenDetails { cached_tokens: 0 },
                 output_tokens: 5,
-                output_tokens_details: OutputTokenDetails { reasoning_tokens: 0 },
+                output_tokens_details: OutputTokenDetails {
+                    reasoning_tokens: 0,
+                },
                 total_tokens: 15,
             },
             billing: Some(Billing { payer: "openai" }),
@@ -771,7 +777,9 @@ mod tests {
             store: true,
             temperature: 1.0,
             text: TextOutput {
-                format: TextFormatOutput { format_type: "text" },
+                format: TextFormatOutput {
+                    format_type: "text",
+                },
                 verbosity: "medium",
             },
             tool_choice: "auto",

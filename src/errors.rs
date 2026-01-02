@@ -126,9 +126,7 @@ fn rate_limit(provider: Provider) -> Response {
 
     let mut response = (status, Json(body)).into_response();
     for (key, value) in headers {
-        response
-            .headers_mut()
-            .insert(key, value.parse().unwrap());
+        response.headers_mut().insert(key, value.parse().unwrap());
     }
     response
 }
