@@ -792,4 +792,137 @@ mod tests {
         assert!(json.contains("Hello!"));
         assert!(json.contains("output_text"));
     }
+
+    #[test]
+    fn test_should_not_call_tool() {
+        let req = ResponsesRequest {
+            model: "gpt-4o".to_string(),
+            input: InputType::Text("Hello there!".to_string()),
+            stream: false,
+            max_output_tokens: None,
+            temperature: None,
+            top_p: None,
+            tools: Some(vec![]),
+            tool_choice: None,
+            reasoning: None,
+            text: None,
+            instructions: None,
+            store: None,
+        };
+
+        assert!(!should_call_tool(&req));
+    }
+
+    #[test]
+    fn test_extract_input_text_string() {
+        let input = InputType::Text("Hello world".to_string());
+        let text = extract_input_text(&input);
+        assert_eq!(text, Some("Hello world"));
+    }
+
+    #[test]
+    fn test_extract_input_text_messages() {
+        let input = InputType::Messages(vec![InputMessage {
+            role: "user".to_string(),
+            content: MessageContent::Text("Hello from messages".to_string()),
+        }]);
+        let text = extract_input_text(&input);
+        assert_eq!(text, Some("Hello from messages"));
+    }
+
+    #[tokio::test]
+    async fn test_responses_non_streaming() {
+        let req = ResponsesRequest {
+            model: "gpt-4o".to_string(),
+            input: InputType::Text("Hello".to_string()),
+            stream: false,
+            max_output_tokens: Some(50),
+            temperature: None,
+            top_p: None,
+            tools: None,
+            tool_choice: None,
+            reasoning: None,
+            text: None,
+            instructions: None,
+            store: None,
+        };
+
+        let response = responses(Json(req)).await;
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_responses_streaming() {
+        let req = ResponsesRequest {
+            model: "gpt-4o".to_string(),
+            input: InputType::Text("Hello".to_string()),
+            stream: true,
+            max_output_tokens: Some(50),
+            temperature: None,
+            top_p: None,
+            tools: None,
+            tool_choice: None,
+            reasoning: None,
+            text: None,
+            instructions: None,
+            store: None,
+        };
+
+        let response = responses(Json(req)).await;
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(
+            response.headers().get("content-type").unwrap(),
+            "text/event-stream"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_responses_with_tools() {
+        let req = ResponsesRequest {
+            model: "gpt-4o".to_string(),
+            input: InputType::Text("What is the weather in NYC?".to_string()),
+            stream: false,
+            max_output_tokens: Some(50),
+            temperature: None,
+            top_p: None,
+            tools: Some(vec![Tool {
+                tool_type: "function".to_string(),
+                name: "get_weather".to_string(),
+                description: Some("Get weather".to_string()),
+                parameters: None,
+            }]),
+            tool_choice: None,
+            reasoning: None,
+            text: None,
+            instructions: None,
+            store: None,
+        };
+
+        let response = responses(Json(req)).await;
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_responses_with_messages_input() {
+        let req = ResponsesRequest {
+            model: "gpt-4o".to_string(),
+            input: InputType::Messages(vec![InputMessage {
+                role: "user".to_string(),
+                content: MessageContent::Text("Hello".to_string()),
+            }]),
+            stream: false,
+            max_output_tokens: Some(50),
+            temperature: None,
+            top_p: None,
+            tools: None,
+            tool_choice: None,
+            reasoning: None,
+            text: None,
+            instructions: None,
+            store: None,
+        };
+
+        let response = responses(Json(req)).await;
+        assert_eq!(response.status(), StatusCode::OK);
+    }
 }

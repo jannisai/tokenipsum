@@ -524,4 +524,154 @@ mod tests {
         assert!(json.contains("get_weather"));
         assert!(json.contains("Tokyo"));
     }
+
+    #[test]
+    fn test_should_not_call_tool() {
+        let req = GenerateContentRequest {
+            contents: vec![Content {
+                role: Some("user".to_string()),
+                parts: vec![Part {
+                    text: Some("Hello there!".to_string()),
+                    function_call: None,
+                    function_response: None,
+                }],
+            }],
+            system_instruction: None,
+            generation_config: None,
+            tools: Some(vec![]),
+            tool_config: None,
+        };
+
+        assert!(!should_call_tool(&req));
+    }
+
+    #[test]
+    fn test_get_first_function_name() {
+        let req = GenerateContentRequest {
+            contents: vec![],
+            system_instruction: None,
+            generation_config: None,
+            tools: Some(vec![ToolDeclaration {
+                function_declarations: Some(vec![FunctionDeclaration {
+                    name: "my_function".to_string(),
+                    description: None,
+                    parameters: None,
+                }]),
+            }]),
+            tool_config: None,
+        };
+
+        let name = get_first_function_name(&req);
+        assert_eq!(name, "my_function");
+    }
+
+    #[test]
+    fn test_extract_argument() {
+        let req = GenerateContentRequest {
+            contents: vec![Content {
+                role: Some("user".to_string()),
+                parts: vec![Part {
+                    text: Some("What is the weather in London?".to_string()),
+                    function_call: None,
+                    function_response: None,
+                }],
+            }],
+            system_instruction: None,
+            generation_config: None,
+            tools: None,
+            tool_config: None,
+        };
+
+        let arg = extract_argument(&req);
+        assert_eq!(arg, "London");
+    }
+
+    #[tokio::test]
+    async fn test_handle_generate_content() {
+        let req = GenerateContentRequest {
+            contents: vec![Content {
+                role: Some("user".to_string()),
+                parts: vec![Part {
+                    text: Some("Hello".to_string()),
+                    function_call: None,
+                    function_response: None,
+                }],
+            }],
+            system_instruction: None,
+            generation_config: Some(GenerationConfig {
+                max_output_tokens: Some(50),
+                temperature: None,
+                top_p: None,
+                stop_sequences: None,
+            }),
+            tools: None,
+            tool_config: None,
+        };
+
+        let response =
+            handle_model_action(Path("gemini-pro:generateContent".to_string()), Json(req)).await;
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_handle_stream_generate_content() {
+        let req = GenerateContentRequest {
+            contents: vec![Content {
+                role: Some("user".to_string()),
+                parts: vec![Part {
+                    text: Some("Hello".to_string()),
+                    function_call: None,
+                    function_response: None,
+                }],
+            }],
+            system_instruction: None,
+            generation_config: Some(GenerationConfig {
+                max_output_tokens: Some(50),
+                temperature: None,
+                top_p: None,
+                stop_sequences: None,
+            }),
+            tools: None,
+            tool_config: None,
+        };
+
+        let response = handle_model_action(
+            Path("gemini-pro:streamGenerateContent".to_string()),
+            Json(req),
+        )
+        .await;
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(
+            response.headers().get("content-type").unwrap(),
+            "text/event-stream"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_handle_with_tools() {
+        let req = GenerateContentRequest {
+            contents: vec![Content {
+                role: Some("user".to_string()),
+                parts: vec![Part {
+                    text: Some("What is the weather in Berlin?".to_string()),
+                    function_call: None,
+                    function_response: None,
+                }],
+            }],
+            system_instruction: None,
+            generation_config: None,
+            tools: Some(vec![ToolDeclaration {
+                function_declarations: Some(vec![FunctionDeclaration {
+                    name: "get_weather".to_string(),
+                    description: Some("Get weather".to_string()),
+                    parameters: None,
+                }]),
+            }]),
+            tool_config: None,
+        };
+
+        let response =
+            handle_model_action(Path("gemini-pro:generateContent".to_string()), Json(req)).await;
+        assert_eq!(response.status(), StatusCode::OK);
+    }
 }
