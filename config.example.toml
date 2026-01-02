@@ -1,0 +1,42 @@
+# TokenIpsum Configuration
+# Copy to config.toml and customize
+
+[server]
+port = 8787
+# Artificial latency in ms (0 = no delay)
+latency_ms = 0
+
+[rate_limit]
+# Enable rate limiting simulation
+enabled = false
+# Requests per minute per endpoint (0 = unlimited)
+requests_per_minute = 60
+# Return 429 after this many requests (0 = never)
+fail_after_requests = 0
+
+[errors]
+# Probability of random errors (0.0 - 1.0)
+# 0.0 = never fail, 0.1 = 10% chance of error
+error_rate = 0.0
+
+# Force specific error for testing
+# Options: none, unauthorized, rate_limit, server_error, timeout
+force_error = "none"
+
+[auth]
+# Require API key validation
+require_auth = false
+# Valid API keys (if require_auth = true)
+valid_keys = ["test-key-123", "sk-test"]
+
+[providers]
+# Enable/disable specific providers
+cerebras = true
+gemini = true
+claude = true
+openai = true
+
+[content]
+# Use deterministic output (same seed = same response)
+deterministic = false
+seed = 42

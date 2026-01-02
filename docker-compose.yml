@@ -1,0 +1,21 @@
+services:
+  tokenipsum:
+    build: .
+    ports:
+      - "8787:8787"
+    environment:
+      - RUST_LOG=tokenipsum=info
+      - PORT=8787
+    volumes:
+      # Mount custom config (optional)
+      - ./config.toml:/app/config.toml:ro
+    env_file:
+      # Load environment variables (optional)
+      - path: .env
+        required: false
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8787/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped

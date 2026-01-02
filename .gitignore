@@ -1,0 +1,16 @@
+/target
+
+# Environment files (contain API keys)
+.env
+.env.local
+config.toml
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
