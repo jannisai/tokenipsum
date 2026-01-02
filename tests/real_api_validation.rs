@@ -157,13 +157,11 @@ mod gemini {
 
     async fn call_real_api(api_key: &str) -> Result<Value, Box<dyn std::error::Error>> {
         let client = reqwest::Client::new();
-        let url = format!(
-            "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={}",
-            api_key
-        );
+        let url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
         let resp = client
-            .post(&url)
+            .post(url)
             .header("Content-Type", "application/json")
+            .header("x-goog-api-key", api_key)
             .json(&serde_json::json!({
                 "contents": [{"role": "user", "parts": [{"text": "Say hi"}]}],
                 "generationConfig": {"maxOutputTokens": 10}
