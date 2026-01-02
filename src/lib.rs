@@ -181,3 +181,281 @@ async fn openai_handler(
 ) -> Response {
     openai::responses(body).await
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::body::Body;
+    use axum::http::{Request, StatusCode};
+    use http_body_util::BodyExt;
+    use tower::ServiceExt;
+
+    #[test]
+    fn test_provider_from_path() {
+        assert!(matches!(
+            provider_from_path("/v1beta/models/gemini:generateContent"),
+            Provider::Gemini
+        ));
+        assert!(matches!(
+            provider_from_path("/v1/messages"),
+            Provider::Claude
+        ));
+        assert!(matches!(
+            provider_from_path("/v1/responses"),
+            Provider::OpenAI
+        ));
+        assert!(matches!(
+            provider_from_path("/v1/chat/completions"),
+            Provider::Cerebras
+        ));
+        assert!(matches!(provider_from_path("/health"), Provider::Cerebras));
+    }
+
+    #[tokio::test]
+    async fn test_health_endpoint() {
+        let config = Config::default();
+        let state = RuntimeState::new(config);
+        let app = create_router(state);
+
+        let response = app
+            .oneshot(Request::get("/health").body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        assert_eq!(&body[..], b"ok");
+    }
+
+    #[tokio::test]
+    async fn test_cerebras_endpoint() {
+        let config = Config::default();
+        let state = RuntimeState::new(config);
+        let app = create_router(state);
+
+        let body = serde_json::json!({
+            "model": "llama-3.3-70b",
+            "messages": [{"role": "user", "content": "Hello"}]
+        });
+
+        let response = app
+            .oneshot(
+                Request::post("/v1/chat/completions")
+                    .header("content-type", "application/json")
+                    .body(Body::from(serde_json::to_string(&body).unwrap()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_claude_endpoint() {
+        let config = Config::default();
+        let state = RuntimeState::new(config);
+        let app = create_router(state);
+
+        let body = serde_json::json!({
+            "model": "claude-3-haiku",
+            "max_tokens": 100,
+            "messages": [{"role": "user", "content": "Hello"}]
+        });
+
+        let response = app
+            .oneshot(
+                Request::post("/v1/messages")
+                    .header("content-type", "application/json")
+                    .body(Body::from(serde_json::to_string(&body).unwrap()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_gemini_endpoint() {
+        let config = Config::default();
+        let state = RuntimeState::new(config);
+        let app = create_router(state);
+
+        let body = serde_json::json!({
+            "contents": [{"role": "user", "parts": [{"text": "Hello"}]}]
+        });
+
+        let response = app
+            .oneshot(
+                Request::post("/v1beta/models/gemini-pro:generateContent")
+                    .header("content-type", "application/json")
+                    .body(Body::from(serde_json::to_string(&body).unwrap()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_openai_endpoint() {
+        let config = Config::default();
+        let state = RuntimeState::new(config);
+        let app = create_router(state);
+
+        let body = serde_json::json!({
+            "model": "gpt-4o",
+            "input": "Hello"
+        });
+
+        let response = app
+            .oneshot(
+                Request::post("/v1/responses")
+                    .header("content-type", "application/json")
+                    .body(Body::from(serde_json::to_string(&body).unwrap()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_auth_required_no_key() {
+        let mut config = Config::default();
+        config.auth.require_auth = true;
+        config.auth.valid_keys = vec!["test-key".to_string()];
+        let state = RuntimeState::new(config);
+        let app = create_router(state);
+
+        let response = app
+            .oneshot(Request::get("/health").body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn test_auth_required_valid_key() {
+        let mut config = Config::default();
+        config.auth.require_auth = true;
+        config.auth.valid_keys = vec!["test-key".to_string()];
+        let state = RuntimeState::new(config);
+        let app = create_router(state);
+
+        let response = app
+            .oneshot(
+                Request::get("/health")
+                    .header("authorization", "Bearer test-key")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_auth_required_invalid_key() {
+        let mut config = Config::default();
+        config.auth.require_auth = true;
+        config.auth.valid_keys = vec!["test-key".to_string()];
+        let state = RuntimeState::new(config);
+        let app = create_router(state);
+
+        let response = app
+            .oneshot(
+                Request::get("/health")
+                    .header("authorization", "Bearer wrong-key")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn test_rate_limit_after_requests() {
+        let mut config = Config::default();
+        config.rate_limit.fail_after_requests = 2;
+        let state = RuntimeState::new(config);
+
+        // First request - should succeed
+        let app = create_router(state.clone());
+        let response = app
+            .oneshot(Request::get("/health").body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+
+        // Second request - should succeed (this is request #2, equals limit)
+        let app = create_router(state.clone());
+        let response = app
+            .oneshot(Request::get("/health").body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);
+    }
+
+    #[tokio::test]
+    async fn test_disabled_provider() {
+        let mut config = Config::default();
+        config.providers.cerebras = false;
+        let state = RuntimeState::new(config);
+        let app = create_router(state);
+
+        let body = serde_json::json!({
+            "model": "llama",
+            "messages": [{"role": "user", "content": "Hello"}]
+        });
+
+        let response = app
+            .oneshot(
+                Request::post("/v1/chat/completions")
+                    .header("content-type", "application/json")
+                    .body(Body::from(serde_json::to_string(&body).unwrap()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn test_forced_error() {
+        let mut config = Config::default();
+        config.errors.force_error = config::ForceError::ServerError;
+        let state = RuntimeState::new(config);
+        let app = create_router(state);
+
+        let response = app
+            .oneshot(Request::get("/health").body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    }
+
+    #[tokio::test]
+    async fn test_forced_timeout_error() {
+        let mut config = Config::default();
+        config.errors.force_error = config::ForceError::Timeout;
+        let state = RuntimeState::new(config);
+        let app = create_router(state);
+
+        let response = app
+            .oneshot(Request::get("/health").body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::GATEWAY_TIMEOUT);
+    }
+}

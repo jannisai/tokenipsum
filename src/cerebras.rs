@@ -535,4 +535,207 @@ mod tests {
 
         assert!(should_call_tool(&req));
     }
+
+    #[test]
+    fn test_should_not_call_tool_no_keyword() {
+        let req = ChatCompletionRequest {
+            model: "test".to_string(),
+            messages: vec![Message {
+                role: "user".to_string(),
+                content: Some("Hello there!".to_string()),
+            }],
+            stream: false,
+            stream_options: None,
+            max_tokens: None,
+            temperature: None,
+            top_p: None,
+            tools: Some(vec![]),
+            tool_choice: None,
+        };
+
+        assert!(!should_call_tool(&req));
+    }
+
+    #[test]
+    fn test_should_not_call_tool_no_keywords() {
+        let req = ChatCompletionRequest {
+            model: "test".to_string(),
+            messages: vec![Message {
+                role: "user".to_string(),
+                content: Some("Tell me a joke".to_string()),
+            }],
+            stream: false,
+            stream_options: None,
+            max_tokens: None,
+            temperature: None,
+            top_p: None,
+            tools: Some(vec![]),
+            tool_choice: None,
+        };
+
+        assert!(!should_call_tool(&req));
+    }
+
+    #[test]
+    fn test_extract_argument() {
+        let req = ChatCompletionRequest {
+            model: "test".to_string(),
+            messages: vec![Message {
+                role: "user".to_string(),
+                content: Some("What is the weather in Tokyo?".to_string()),
+            }],
+            stream: false,
+            stream_options: None,
+            max_tokens: None,
+            temperature: None,
+            top_p: None,
+            tools: None,
+            tool_choice: None,
+        };
+
+        let arg = extract_argument(&req);
+        assert_eq!(arg, "Tokyo");
+    }
+
+    #[test]
+    fn test_extract_argument_no_content() {
+        let req = ChatCompletionRequest {
+            model: "test".to_string(),
+            messages: vec![Message {
+                role: "user".to_string(),
+                content: None,
+            }],
+            stream: false,
+            stream_options: None,
+            max_tokens: None,
+            temperature: None,
+            top_p: None,
+            tools: None,
+            tool_choice: None,
+        };
+
+        let arg = extract_argument(&req);
+        assert_eq!(arg, "unknown");
+    }
+
+    #[test]
+    fn test_now_unix() {
+        let ts = now_unix();
+        assert!(ts > 1700000000); // After 2023
+    }
+
+    #[test]
+    fn test_generate_content_chunks() {
+        let mut gen = ContentGenerator::with_seed(42);
+        let chunks = generate_content_chunks(&mut gen, 10, "test-id", "llama", "fp_test");
+        assert!(!chunks.is_empty());
+        // First chunk should have role
+        let first = &chunks[0];
+        assert!(first.to_string().contains("assistant"));
+    }
+
+    #[test]
+    fn test_generate_tool_chunks() {
+        let req = ChatCompletionRequest {
+            model: "llama".to_string(),
+            messages: vec![Message {
+                role: "user".to_string(),
+                content: Some("What is the weather in Tokyo?".to_string()),
+            }],
+            stream: false,
+            stream_options: None,
+            max_tokens: None,
+            temperature: None,
+            top_p: None,
+            tools: Some(vec![Tool {
+                tool_type: "function".to_string(),
+                function: ToolFunction {
+                    name: "get_weather".to_string(),
+                    description: Some("Get weather".to_string()),
+                    parameters: None,
+                },
+            }]),
+            tool_choice: None,
+        };
+        let mut gen = ContentGenerator::with_seed(42);
+        let chunks = generate_tool_chunks(&req, &mut gen, "test-id", "llama", "fp_test");
+        assert_eq!(chunks.len(), 2);
+        // Should contain tool_calls
+        let second = &chunks[1];
+        assert!(second.to_string().contains("tool_calls"));
+    }
+
+    #[tokio::test]
+    async fn test_chat_completions_non_streaming() {
+        let req = ChatCompletionRequest {
+            model: "llama".to_string(),
+            messages: vec![Message {
+                role: "user".to_string(),
+                content: Some("Hello".to_string()),
+            }],
+            stream: false,
+            stream_options: None,
+            max_tokens: Some(50),
+            temperature: None,
+            top_p: None,
+            tools: None,
+            tool_choice: None,
+        };
+
+        let response = chat_completions(Json(req)).await;
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_chat_completions_streaming() {
+        let req = ChatCompletionRequest {
+            model: "llama".to_string(),
+            messages: vec![Message {
+                role: "user".to_string(),
+                content: Some("Hello".to_string()),
+            }],
+            stream: true,
+            stream_options: None,
+            max_tokens: Some(50),
+            temperature: None,
+            top_p: None,
+            tools: None,
+            tool_choice: None,
+        };
+
+        let response = chat_completions(Json(req)).await;
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(
+            response.headers().get("content-type").unwrap(),
+            "text/event-stream"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_chat_completions_with_tools() {
+        let req = ChatCompletionRequest {
+            model: "llama".to_string(),
+            messages: vec![Message {
+                role: "user".to_string(),
+                content: Some("What is the weather in Paris?".to_string()),
+            }],
+            stream: false,
+            stream_options: None,
+            max_tokens: Some(50),
+            temperature: None,
+            top_p: None,
+            tools: Some(vec![Tool {
+                tool_type: "function".to_string(),
+                function: ToolFunction {
+                    name: "get_weather".to_string(),
+                    description: Some("Get weather".to_string()),
+                    parameters: None,
+                },
+            }]),
+            tool_choice: None,
+        };
+
+        let response = chat_completions(Json(req)).await;
+        assert_eq!(response.status(), StatusCode::OK);
+    }
 }

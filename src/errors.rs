@@ -213,15 +213,80 @@ mod tests {
 
     #[test]
     fn test_unauthorized_responses() {
-        let _ = unauthorized(Provider::Cerebras);
-        let _ = unauthorized(Provider::Gemini);
-        let _ = unauthorized(Provider::Claude);
-        let _ = unauthorized(Provider::OpenAI);
+        let resp = unauthorized(Provider::Cerebras);
+        assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+
+        let resp = unauthorized(Provider::Gemini);
+        assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+
+        let resp = unauthorized(Provider::Claude);
+        assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+
+        let resp = unauthorized(Provider::OpenAI);
+        assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
     }
 
     #[test]
     fn test_rate_limit_responses() {
+        let resp = rate_limit(Provider::Cerebras);
+        assert_eq!(resp.status(), StatusCode::TOO_MANY_REQUESTS);
+        assert!(resp.headers().contains_key("retry-after"));
+
+        let resp = rate_limit(Provider::Gemini);
+        assert_eq!(resp.status(), StatusCode::TOO_MANY_REQUESTS);
+        assert!(resp.headers().contains_key("retry-after"));
+
         let resp = rate_limit(Provider::Claude);
         assert_eq!(resp.status(), StatusCode::TOO_MANY_REQUESTS);
+        assert!(resp.headers().contains_key("retry-after"));
+
+        let resp = rate_limit(Provider::OpenAI);
+        assert_eq!(resp.status(), StatusCode::TOO_MANY_REQUESTS);
+        assert!(resp.headers().contains_key("retry-after"));
+    }
+
+    #[test]
+    fn test_server_error_responses() {
+        let resp = server_error(Provider::Cerebras);
+        assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
+
+        let resp = server_error(Provider::Gemini);
+        assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
+
+        let resp = server_error(Provider::Claude);
+        assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
+
+        let resp = server_error(Provider::OpenAI);
+        assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    }
+
+    #[test]
+    fn test_timeout_responses() {
+        let resp = timeout(Provider::Cerebras);
+        assert_eq!(resp.status(), StatusCode::GATEWAY_TIMEOUT);
+
+        let resp = timeout(Provider::Gemini);
+        assert_eq!(resp.status(), StatusCode::GATEWAY_TIMEOUT);
+
+        let resp = timeout(Provider::Claude);
+        assert_eq!(resp.status(), StatusCode::GATEWAY_TIMEOUT);
+
+        let resp = timeout(Provider::OpenAI);
+        assert_eq!(resp.status(), StatusCode::GATEWAY_TIMEOUT);
+    }
+
+    #[test]
+    fn test_error_response_dispatch() {
+        let resp = error_response(ErrorType::Unauthorized, Provider::Claude);
+        assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+
+        let resp = error_response(ErrorType::RateLimit, Provider::Gemini);
+        assert_eq!(resp.status(), StatusCode::TOO_MANY_REQUESTS);
+
+        let resp = error_response(ErrorType::ServerError, Provider::OpenAI);
+        assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
+
+        let resp = error_response(ErrorType::Timeout, Provider::Cerebras);
+        assert_eq!(resp.status(), StatusCode::GATEWAY_TIMEOUT);
     }
 }

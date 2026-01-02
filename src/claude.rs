@@ -657,4 +657,188 @@ mod tests {
 
         assert!(should_call_tool(&req));
     }
+
+    #[test]
+    fn test_should_not_call_tool() {
+        let req = MessagesRequest {
+            model: "test".to_string(),
+            messages: vec![Message {
+                role: "user".to_string(),
+                content: MessageContent::Text("Hello there!".to_string()),
+            }],
+            max_tokens: 100,
+            stream: false,
+            system: None,
+            temperature: None,
+            tools: Some(vec![]),
+            thinking: None,
+        };
+
+        assert!(!should_call_tool(&req));
+    }
+
+    #[test]
+    fn test_thinking_config_deserialize() {
+        let json = r#"{
+            "model": "claude",
+            "max_tokens": 100,
+            "thinking": {"type": "enabled", "budget_tokens": 1024},
+            "messages": [{"role": "user", "content": "Hello"}]
+        }"#;
+        let req: MessagesRequest = serde_json::from_str(json).unwrap();
+        assert!(req.thinking.is_some());
+        assert_eq!(req.thinking.unwrap().budget_tokens, 1024);
+    }
+
+    #[test]
+    fn test_extract_argument() {
+        let req = MessagesRequest {
+            model: "test".to_string(),
+            messages: vec![Message {
+                role: "user".to_string(),
+                content: MessageContent::Text("What is the weather in Paris?".to_string()),
+            }],
+            max_tokens: 100,
+            stream: false,
+            system: None,
+            temperature: None,
+            tools: None,
+            thinking: None,
+        };
+
+        let arg = extract_argument(&req);
+        assert_eq!(arg, "Paris");
+    }
+
+    #[test]
+    fn test_count_input_tokens() {
+        let req = MessagesRequest {
+            model: "test".to_string(),
+            messages: vec![Message {
+                role: "user".to_string(),
+                content: MessageContent::Text("Hello world".to_string()),
+            }],
+            max_tokens: 100,
+            stream: false,
+            system: Some("You are helpful.".to_string()),
+            temperature: None,
+            tools: None,
+            thinking: None,
+        };
+
+        let tokens = count_input_tokens(&req);
+        assert!(tokens > 0);
+    }
+
+    #[test]
+    fn test_generate_message_id() {
+        let mut gen = ContentGenerator::with_seed(42);
+        let id = generate_message_id(&mut gen);
+        assert!(id.starts_with("msg_"));
+    }
+
+    #[test]
+    fn test_generate_tool_use_id() {
+        let mut gen = ContentGenerator::with_seed(42);
+        let id = generate_tool_use_id(&mut gen);
+        assert!(id.starts_with("toolu_"));
+    }
+
+    #[test]
+    fn test_generate_signature() {
+        let mut gen = ContentGenerator::with_seed(42);
+        let sig = generate_signature(&mut gen);
+        assert!(!sig.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_messages_non_streaming() {
+        let req = MessagesRequest {
+            model: "claude-haiku".to_string(),
+            messages: vec![Message {
+                role: "user".to_string(),
+                content: MessageContent::Text("Hello".to_string()),
+            }],
+            max_tokens: 100,
+            stream: false,
+            system: None,
+            temperature: None,
+            tools: None,
+            thinking: None,
+        };
+
+        let response = messages(Json(req)).await;
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_messages_streaming() {
+        let req = MessagesRequest {
+            model: "claude-haiku".to_string(),
+            messages: vec![Message {
+                role: "user".to_string(),
+                content: MessageContent::Text("Hello".to_string()),
+            }],
+            max_tokens: 100,
+            stream: true,
+            system: None,
+            temperature: None,
+            tools: None,
+            thinking: None,
+        };
+
+        let response = messages(Json(req)).await;
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(
+            response.headers().get("content-type").unwrap(),
+            "text/event-stream"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_messages_with_thinking() {
+        let req = MessagesRequest {
+            model: "claude-haiku".to_string(),
+            messages: vec![Message {
+                role: "user".to_string(),
+                content: MessageContent::Text("What is 2+2?".to_string()),
+            }],
+            max_tokens: 2000,
+            stream: false,
+            system: None,
+            temperature: None,
+            tools: None,
+            thinking: Some(ThinkingConfig {
+                thinking_type: "enabled".to_string(),
+                budget_tokens: 1024,
+            }),
+        };
+
+        let response = messages(Json(req)).await;
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_messages_with_tools() {
+        let req = MessagesRequest {
+            model: "claude-haiku".to_string(),
+            messages: vec![Message {
+                role: "user".to_string(),
+                content: MessageContent::Text("What is the weather in Tokyo?".to_string()),
+            }],
+            max_tokens: 100,
+            stream: false,
+            system: None,
+            temperature: None,
+            tools: Some(vec![Tool {
+                name: "get_weather".to_string(),
+                description: Some("Get weather".to_string()),
+                input_schema: None,
+            }]),
+            thinking: None,
+        };
+
+        let response = messages(Json(req)).await;
+        assert_eq!(response.status(), StatusCode::OK);
+    }
 }
